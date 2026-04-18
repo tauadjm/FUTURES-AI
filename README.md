@@ -34,10 +34,10 @@ FastAPI + SSE ──→ 浏览器前端（实时面板 / 权益曲线）
 
 ```
 Parquet历史K线
-     |
-     v
+     │
+     ↓
 逐根重建 market_data ──→ 策略层特征计算 ──→ 真实LLM分析 ──→ 追踪止损模拟
-                                                                   |
+                                                                   │
 /backtest/* API ──→ backtest.html（K线图可视化）        统计汇总（胜率/盈亏R）
 ```
 
@@ -58,7 +58,7 @@ Parquet历史K线
 ## 技术栈
 
 **后端**
-- Python 3.11+
+- Python 3.14
 - FastAPI + uvicorn（异步 Web 框架）
 - TqSdk（天勤量化，期货行情与交易接口）
 - asyncio + 多线程（tqsdk 线程与 asyncio 事件循环隔离）
@@ -106,6 +106,7 @@ Parquet历史K线
 - **追踪止损模拟**：K 线级分段追踪（0.6R / 1R / 2R 三档）+ 止盈感知收紧，分段逻辑与实盘一致；但实盘为 tick 级执行，回测存在 K 线内滑点误差
 - **可视化交互**：Lightweight Charts K 线图点击任意 Bar → 查看预计算面板 → 触发 AI 分析 → 模拟出场
 - **统计汇总**：胜率 / 平均盈亏 R / 盈亏比 / 期望值
+- **内置历史数据**：仓库已附带部分商品期货 K 线数据（`data/klines/`），克隆后可直接运行回测；回测页面支持在线下载更多品种的历史数据，无需手动执行脚本
 
 ---
 
@@ -170,6 +171,7 @@ python main.py
 ├── trader.py             # 下单执行
 ├── strategies/
 │   ├── __init__.py           # 策略注册表
+│   ├── prompts.py            # System Prompt 字符串（中英文双语，开源）
 │   └── *.cp314-win_amd64.pyd # 策略模块（编译发布，不开源）
 ├── backtest/
 │   ├── engine.py         # 回测引擎
@@ -181,6 +183,7 @@ python main.py
 ├── calc_fee.py           # 手续费计算
 ├── calc_trail.py         # 追踪止损推算器
 ├── download_klines.py    # 历史 K 线下载
+├── data/klines/          # 历史 K 线数据（Parquet，供回测用）
 └── requirements.txt
 ```
 
