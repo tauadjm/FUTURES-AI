@@ -208,7 +208,7 @@ __marimo__/
 
 # FuturesAI 项目专用
 !*.pyd
-data/
+data/*
 !data/klines/
 logs/
 ai_raw_logs/
