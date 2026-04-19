@@ -1,5 +1,7 @@
 """
 main.py — 主程序（多合约版）
+
+_tauadjm
 """
 
 import sys, pathlib, subprocess
@@ -1753,6 +1755,7 @@ async def lifespan(app: FastAPI):
         trader._load_guards()
 
     logger.info(f"服务已启动，访问 http://localhost:{config.PORT}")
+    logger.info("GitHub: https://github.com/tauadjm/FUTURES-AI")
     logger.info("=" * 50)
 
     yield
@@ -1775,6 +1778,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="期货 AI 实时分析系统（多合约版）", lifespan=lifespan)
+
+@app.middleware("http")
+async def _add_signature(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Author"] = "tauadjm"
+    response.headers["X-Source"] = "https://github.com/tauadjm/FUTURES-AI"
+    return response
 
 from backtest.router import backtest_router
 app.include_router(backtest_router)

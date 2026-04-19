@@ -5,6 +5,8 @@ config.py — 配置层
 1. 从 .env 读取所有参数
 2. 扫描哪些 AI 模型已配置 API Key，生成可用模型列表
 3. 提供 is_trading_time(symbol, dt) 函数，判断当前是否处于交易时间
+
+_tauadjm
 """
 
 import os

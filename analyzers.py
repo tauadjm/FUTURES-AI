@@ -8,7 +8,11 @@ analyzers.py — AI 层
 4. 处理所有异常（网络超时、Key 无效、JSON 解析失败），不向上抛出
 
 支持模型：claude / openai / deepseek / grok / qwen / gemini
+
+_tauadjm
 """
+
+_AUTHOR = "tauadjm <https://github.com/tauadjm/FUTURES-AI>"
 
 import re
 import json
@@ -819,6 +823,7 @@ async def _call_openai_compatible(model_id: str,
             api_key=cfg["api_key"],
             base_url=cfg.get("base_url"),
             http_client=http_client,
+            default_headers={"User-Agent": "FuturesAI/1.0 (tauadjm)"},
         )
 
         chunks = []
