@@ -123,8 +123,10 @@ html,body { height:100%; background:var(--bg); color:var(--text);
   box-shadow:0 4px 16px rgba(0,0,0,.4);
 }
 .chart-tooltip .tip-time { font-size:11px; color:#6a8fa3; margin-bottom:4px }
-.chart-tooltip .tip-val  { font-size:14px; font-weight:700 }
-.chart-tooltip .tip-mdl  { font-size:10px; color:#6a8fa3; margin-top:3px }
+.tip-entry { display:flex; align-items:baseline; gap:8px; margin-top:3px }
+.tip-entry .tip-val  { font-size:14px; font-weight:700 }
+.tip-entry .tip-mdl  { font-size:10px; color:#6a8fa3 }
+.tip-entry+.tip-entry { border-top:1px solid rgba(139,170,184,0.15); padding-top:3px; margin-top:3px }
 
 /* ── Daily P&L Chart ── */
 .canvas-wrap-sm { height:180px }
@@ -253,8 +255,7 @@ td.short { color:var(--teal);  font-family:var(--mono) }
       <canvas id="main-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none"></canvas>
       <div class="chart-tooltip" id="main-tooltip">
         <div class="tip-time" id="tip-time"></div>
-        <div class="tip-val"  id="tip-val"></div>
-        <div class="tip-mdl"  id="tip-mdl"></div>
+        <div id="tip-entries"></div>
       </div>
     </div>
   </div>
@@ -788,7 +789,7 @@ function _clearOverlay(){
   ctx.clearRect(0,0,ov.width,ov.height);
 }
 
-function _drawOverlayDot(best){
+function _drawOverlayDot(pts){
   const ov=document.getElementById('main-overlay');
   const wrap=document.getElementById('main-wrap');
   if(!ov||!wrap) return;
@@ -797,22 +798,20 @@ function _drawOverlayDot(best){
   const ctx=ov.getContext('2d'); ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,wrap.clientWidth,wrap.clientHeight);
 
+  const ref=Array.isArray(pts)?pts[0]:pts;
   // vertical crosshair line
   ctx.strokeStyle='rgba(139,170,184,0.18)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
-  ctx.beginPath(); ctx.moveTo(best.x,0); ctx.lineTo(best.x,wrap.clientHeight); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ref.x,0); ctx.lineTo(ref.x,wrap.clientHeight); ctx.stroke();
   ctx.setLineDash([]);
 
-  // outer glow ring
-  ctx.beginPath(); ctx.arc(best.x,best.y,8,0,Math.PI*2);
-  ctx.fillStyle=hexToRgba(best.color,0.2); ctx.fill();
-
-  // white border circle
-  ctx.beginPath(); ctx.arc(best.x,best.y,5,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2; ctx.stroke();
-
-  // filled dot
-  ctx.beginPath(); ctx.arc(best.x,best.y,4,0,Math.PI*2);
-  ctx.fillStyle=best.color; ctx.fill();
+  (Array.isArray(pts)?pts:[pts]).forEach(p=>{
+    ctx.beginPath(); ctx.arc(p.x,p.y,8,0,Math.PI*2);
+    ctx.fillStyle=hexToRgba(p.color,0.2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,5,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x,p.y,4,0,Math.PI*2);
+    ctx.fillStyle=p.color; ctx.fill();
+  });
 }
 
 function initChartTooltip(){
@@ -825,24 +824,27 @@ function initChartTooltip(){
     const rect=wrap.getBoundingClientRect();
     const mx=e.clientX-rect.left;
 
-    let best=null, bestDist=Infinity;
-    _mainChartPoints.forEach(p=>{
-      const d=Math.abs(p.x-mx);
-      if(d<bestDist){ bestDist=d; best=p; }
-    });
+    let bestDist=Infinity;
+    _mainChartPoints.forEach(p=>{ const d=Math.abs(p.x-mx); if(d<bestDist) bestDist=d; });
 
-    if(best&&bestDist<44){
-      _drawOverlayDot(best);
+    if(bestDist<44){
+      // collect all points at (approximately) the same X
+      const hits=_mainChartPoints.filter(p=>Math.abs(p.x-mx)-bestDist<1);
+      _drawOverlayDot(hits);
 
-      const showModel=_mainChartPoints.some(p=>p.model!==best.model);
-      document.getElementById('tip-time').textContent=(best.time||'').slice(0,16).replace('T',' ');
-      document.getElementById('tip-val').textContent=fmtSigned(best.value);
-      document.getElementById('tip-val').style.color=best.color;
-      document.getElementById('tip-mdl').textContent=showModel?best.model:'';
+      const showModel=_mainChartPoints.some(p=>p.model!==hits[0].model);
+      document.getElementById('tip-time').textContent=(hits[0].time||'').slice(0,16).replace('T',' ');
+      const entries=document.getElementById('tip-entries');
+      entries.innerHTML=hits.map(p=>`
+        <div class="tip-entry">
+          <span class="tip-val" style="color:${p.color}">${fmtSigned(p.value)}</span>
+          ${showModel?`<span class="tip-mdl">${p.model}</span>`:''}
+        </div>`).join('');
 
-      const TW=160, TH=60;
-      let tx=best.x+14, ty=best.y-TH/2;
-      if(tx+TW>wrap.clientWidth-8) tx=best.x-TW-14;
+      const TW=160, TH=50+hits.length*22;
+      const ref=hits[0];
+      let tx=ref.x+14, ty=ref.y-TH/2;
+      if(tx+TW>wrap.clientWidth-8) tx=ref.x-TW-14;
       ty=Math.max(4,Math.min(ty,wrap.clientHeight-TH-4));
       tip.style.left=tx+'px'; tip.style.top=ty+'px';
       tip.style.display='block';
