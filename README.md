@@ -15,7 +15,7 @@
 
 <img width="2904" height="1679" alt="屏幕截图 2026-04-21 004746" src="https://github.com/user-attachments/assets/a04f69e3-9795-4730-92b4-1039f7272520" />
 
-<img width="2923" height="1692" alt="屏幕截图 2026-04-21 004615" src="https://github.com/user-attachments/assets/4efd89f0-b504-4b7b-82bd-9fc5f5a99dd2" />
+<img width="2906" height="1687" alt="屏幕截图 2026-04-21 004948" src="https://github.com/user-attachments/assets/95beafd0-4970-4215-959b-f2e08a9e65cb" />
 
 ---
 
