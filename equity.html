@@ -763,20 +763,20 @@ function drawCumulativeChart(canvasId, trades, singleColor, snapshotMode){
     });
   });
 
-  const step=Math.max(1,Math.floor(trades.length/6));
   ctx.font='10px monospace'; ctx.textAlign='center'; ctx.setLineDash([]);
-  let _lastDate='';
-  for(let i=0;i<trades.length;i+=step){
+  let _lastDate='', _lastLabelX=-Infinity;
+  const MIN_LABEL_PX=52;
+  for(let i=0;i<tTimes.length;i++){
     const t=tTimes[i]||'';
-    const date=t.slice(0,10);     // "2024-04-10"
-    const time=t.slice(11,16);    // "10:55"
+    const date=t.slice(0,10);
     if(date!==_lastDate){
-      ctx.fillStyle='#8baab8';
-      ctx.fillText(date.slice(5), xOf(t), H-PAD.bottom+14);
+      const x=xOf(t);
+      if(x-_lastLabelX>=MIN_LABEL_PX){
+        ctx.fillStyle='#8baab8';
+        ctx.fillText(date.slice(5), x, H-PAD.bottom+14);
+        _lastLabelX=x;
+      }
       _lastDate=date;
-    } else {
-      ctx.fillStyle='#8baab8';
-      ctx.fillText(time, xOf(t), H-PAD.bottom+14);
     }
   }
 }
@@ -828,8 +828,9 @@ function initChartTooltip(){
     _mainChartPoints.forEach(p=>{ const d=Math.abs(p.x-mx); if(d<bestDist) bestDist=d; });
 
     if(bestDist<44){
-      // collect all points at (approximately) the same X
-      const hits=_mainChartPoints.filter(p=>Math.abs(p.x-mx)-bestDist<1);
+      // pick single closest point only
+      const best=_mainChartPoints.reduce((a,p)=>Math.abs(p.x-mx)<Math.abs(a.x-mx)?p:a);
+      const hits=[best];
       _drawOverlayDot(hits);
 
       const showModel=_mainChartPoints.some(p=>p.model!==hits[0].model);

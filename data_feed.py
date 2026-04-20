@@ -1083,8 +1083,6 @@ class TqFeed:
             "是否窄幅区间":    False,
             "前时段高点":      None,
             "前时段低点":      None,
-            "微趋势线价位":    None,
-            "微趋势线突破":    False,
             "主趋势线价位":    None,
             "主趋势线突破":    False,
             "趋势末期警告":    False,

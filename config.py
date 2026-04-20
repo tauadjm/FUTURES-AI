@@ -51,6 +51,10 @@ NVIDIA_API_KEY: str    = os.getenv("NVIDIA_API_KEY", "")
 NVIDIA_BASE_URL: str   = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 NVIDIA_MODEL_NAME: str = os.getenv("NVIDIA_MODEL_NAME", "deepseek-ai/deepseek-v3.2")
 
+DEEPSEEK2_API_KEY: str    = os.getenv("DEEPSEEK2_API_KEY", "")
+DEEPSEEK2_BASE_URL: str   = os.getenv("DEEPSEEK2_BASE_URL", "http://127.0.0.1:3000/v1")
+DEEPSEEK2_MODEL_NAME: str = os.getenv("DEEPSEEK2_MODEL_NAME", "deepseek-chat-expert")
+
 CLAUDE2API_API_KEY: str    = os.getenv("CLAUDE_API_KEY", "")
 CLAUDE2API_BASE_URL: str   = os.getenv("CLAUDE_BASE_URL", "http://localhost:8080/v1")
 CLAUDE2API_MODEL_NAME: str = os.getenv("CLAUDE_MODEL_NAME", "claude-sonnet-4-6")
@@ -98,6 +102,7 @@ ENABLE_REVERSAL:         bool = os.getenv("ENABLE_REVERSAL",         "true").low
 ENABLE_SKIP_NARROW:      bool = os.getenv("ENABLE_SKIP_NARROW",      "true").lower() == "true"
 ENABLE_SKIP_OSCILLATION: bool = os.getenv("ENABLE_SKIP_OSCILLATION", "true").lower() == "true"
 ENABLE_WECHAT_PUSH:      bool = os.getenv("ENABLE_WECHAT_PUSH",      "false").lower() == "true"
+ENABLE_FORCE_1R:         bool = os.getenv("ENABLE_FORCE_1R",         "true").lower() == "true"
 
 # ── AI 模型注册表 ────────────────────────────────────────────
 # 新增模型只需在这里加一条，其他文件无需改动
@@ -116,6 +121,13 @@ MODEL_DEFINITIONS: dict = {
         "api_key":      DEEPSEEK_API_KEY,
         "base_url":     DEEPSEEK_BASE_URL,
         "lang":         "zh",   # 中文 Prompt（中文模型语义更准确）
+    },
+    "deepseek2": {
+        "display_name": "DeepSeek2api (本地代理)",
+        "model_name":   DEEPSEEK2_MODEL_NAME,
+        "api_key":      DEEPSEEK2_API_KEY,
+        "base_url":     DEEPSEEK2_BASE_URL,
+        "lang":         "zh",
     },
     "claude2api": {
         "display_name": "Claude2API (本地代理)",

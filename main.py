@@ -2229,6 +2229,7 @@ async def get_settings():
         "enable_skip_narrow":      _c.ENABLE_SKIP_NARROW,
         "enable_skip_oscillation": _c.ENABLE_SKIP_OSCILLATION,
         "enable_wechat_push":      _c.ENABLE_WECHAT_PUSH,
+        "enable_force_1r":         _c.ENABLE_FORCE_1R,
     })
 
 
@@ -2262,6 +2263,7 @@ async def save_settings(request: Request):
         "enable_skip_narrow":      "ENABLE_SKIP_NARROW",
         "enable_skip_oscillation": "ENABLE_SKIP_OSCILLATION",
         "enable_wechat_push":      "ENABLE_WECHAT_PUSH",
+        "enable_force_1r":         "ENABLE_FORCE_1R",
     }
 
     if "max_concurrent" in body:
@@ -2294,8 +2296,9 @@ async def save_settings(request: Request):
             sv = "true" if val else "false"
         if sv == "" and fk.endswith("_key"):
             continue
+        if env.get(ek) != sv:
+            changed.append(ek)
         env[ek] = sv
-        changed.append(ek)
 
     raw_lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
     written: set[str] = set()

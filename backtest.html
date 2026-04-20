@@ -439,10 +439,15 @@ tr:hover td { background:var(--ghost) }
         </div>
 
         <!-- EMA组 -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:5px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:5px">
           <div class="pg-item"><div class="pg-label">EMA缺口</div><div class="pg-val" id="pre-ema-gap">—</div></div>
           <div class="pg-item"><div class="pg-label">EMA方向</div><div class="pg-val" id="pre-ema-dir">—</div></div>
-          <div class="pg-item"><div class="pg-label">首次缺口确认</div><div class="pg-val" id="pre-ema-first">—</div></div>
+        </div>
+
+        <!-- 信号棒评级 -->
+        <div style="margin-bottom:5px">
+          <div class="pg-label" style="margin-bottom:3px">信号棒评级（近3根）</div>
+          <div id="pre-bar-ratings" style="font-family:var(--mono);font-size:10px;color:var(--text)">—</div>
         </div>
 
         <!-- 区间信息（有值才显示） -->
@@ -450,6 +455,28 @@ tr:hover td { background:var(--ghost) }
           <span style="color:var(--muted)">上沿</span> <span id="pre-range-hi" style="color:var(--text)">—</span>
           <span style="color:var(--muted);margin-left:8px">下沿</span> <span id="pre-range-lo" style="color:var(--text)">—</span>
           <span style="color:var(--muted);margin-left:8px">位置</span> <span id="pre-range-pos" style="color:var(--amber)">—</span>
+        </div>
+
+        <!-- 剩余空间 + 测量目标（趋势相关，有值才显示） -->
+        <div id="pre-space-row" style="display:none;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:5px">
+          <div class="pg-item" id="pre-long-space-wrap">
+            <div class="pg-label">做多剩余空间</div>
+            <div class="pg-val" id="pre-long-space" style="color:#4ade80">—</div>
+          </div>
+          <div class="pg-item" id="pre-short-space-wrap">
+            <div class="pg-label">做空剩余空间</div>
+            <div class="pg-val" id="pre-short-space" style="color:#f87171">—</div>
+          </div>
+        </div>
+        <div id="pre-targets-row" style="display:none;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px">
+          <div class="pg-item" id="pre-target-up-wrap">
+            <div class="pg-label">测量目标向上</div>
+            <div class="pg-val" id="pre-target-up" style="color:#4ade80">—</div>
+          </div>
+          <div class="pg-item" id="pre-target-dn-wrap">
+            <div class="pg-label">测量目标向下</div>
+            <div class="pg-val" id="pre-target-dn" style="color:#f87171">—</div>
+          </div>
         </div>
       </div>
 
@@ -1248,10 +1275,19 @@ function renderPrecompute(data) {
   const gap = ema['EMA缺口K线数'];
   document.getElementById('pre-ema-gap').textContent = gap != null ? gap + '根' : '—';
   document.getElementById('pre-ema-dir').textContent = ema['EMA方向'] ?? '—';
-  const firstGap = ema['首次EMA缺口确认'];
-  const fgEl = document.getElementById('pre-ema-first');
-  fgEl.textContent = firstGap ? '是' : firstGap === false ? '否' : '—';
-  fgEl.style.color = firstGap ? '#f59e0b' : 'var(--text)';
+
+  // ── 信号棒评级 ──
+  const ratings = data['最近3根信号棒评级'];
+  const ratingsEl = document.getElementById('pre-bar-ratings');
+  if (Array.isArray(ratings) && ratings.length) {
+    ratingsEl.innerHTML = ratings.map(r => {
+      const rt = r['评级'] || r['rating'] || '—';
+      const color = rt.includes('强') ? '#f59e0b' : rt.includes('弱') || rt === '十字星' ? 'var(--muted)' : 'var(--text)';
+      return `<span style="color:${color};margin-right:10px">${rt}</span>`;
+    }).join('');
+  } else {
+    ratingsEl.textContent = '—';
+  }
 
   // ── 震荡区间（有值才显示） ──
   const hi  = data['交易区间上沿'];
@@ -1267,6 +1303,35 @@ function renderPrecompute(data) {
   } else {
     rd.style.display = 'none';
   }
+
+  // ── 剩余空间 + 测量目标（按趋势方向过滤） ──
+  const isUp   = trend.includes('上升');
+  const isDn   = trend.includes('下降');
+  const longSpace  = data['做多剩余空间%'];
+  const shortSpace = data['做空剩余空间%'];
+  const targUp = data['测量目标向上'];  // list or null
+  const targDn = data['测量目标向下'];
+
+  // 剩余空间行
+  const showLongSpace  = isUp  && longSpace  != null;
+  const showShortSpace = isDn  && shortSpace != null;
+  document.getElementById('pre-long-space-wrap').style.display  = showLongSpace  ? '' : 'none';
+  document.getElementById('pre-short-space-wrap').style.display = showShortSpace ? '' : 'none';
+  document.getElementById('pre-long-space').textContent  = showLongSpace  ? longSpace  + '%' : '—';
+  document.getElementById('pre-short-space').textContent = showShortSpace ? shortSpace + '%' : '—';
+  const showSpaceRow = showLongSpace || showShortSpace;
+  document.getElementById('pre-space-row').style.display = showSpaceRow ? 'grid' : 'none';
+
+  // 测量目标行
+  const fmtTargets = (arr) => Array.isArray(arr) && arr.length ? arr.join(' / ') : null;
+  const targUpStr  = isUp && fmtTargets(targUp);
+  const targDnStr  = isDn && fmtTargets(targDn);
+  document.getElementById('pre-target-up-wrap').style.display = targUpStr ? '' : 'none';
+  document.getElementById('pre-target-dn-wrap').style.display = targDnStr ? '' : 'none';
+  document.getElementById('pre-target-up').textContent = targUpStr || '—';
+  document.getElementById('pre-target-dn').textContent = targDnStr || '—';
+  const showTargRow = !!(targUpStr || targDnStr);
+  document.getElementById('pre-targets-row').style.display = showTargRow ? 'grid' : 'none';
 
   document.getElementById('precompute-panel').style.display = '';
 }

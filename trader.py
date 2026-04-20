@@ -540,6 +540,17 @@ def set_guard(actual_symbol: str, direction: str, stop_loss: float | None, take_
     feed = data_feed._feed
     if feed is None:
         return
+    # 强制 1:1 风险回报：若止损距离 > 止盈距离，将止损收紧至与止盈等距
+    if config.ENABLE_FORCE_1R and entry_price and stop_loss and take_profit:
+        sl_dist = abs(entry_price - stop_loss)
+        tp_dist = abs(take_profit - entry_price)
+        if sl_dist > tp_dist and tp_dist > 0:
+            original_sl = stop_loss
+            if direction == "LONG":
+                stop_loss = entry_price - tp_dist
+            else:
+                stop_loss = entry_price + tp_dist
+            logger.info(f"止损收紧至1:1 {direction} 原止损:{original_sl} → {stop_loss} (止盈距:{tp_dist:.2f})")
     initial_risk = abs(entry_price - stop_loss) if (entry_price and stop_loss) else None
     if order_tag:
         guard_key = f"{actual_symbol}::{model_id}::{order_tag}" if model_id else f"{actual_symbol}::{order_tag}"

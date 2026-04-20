@@ -221,7 +221,7 @@ html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--text
 /* ── PRICE display ────────────────────── */
 .price-hero { margin-bottom:4px }
 .price-val {
-  font-family:var(--mono); font-size:42px; font-weight:700;
+  font-family:var(--mono); font-size:52px; font-weight:700;
   line-height:1; letter-spacing:-1px; color:var(--text);
 }
 .price-val.up { color:var(--rose) }
@@ -231,9 +231,9 @@ html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--text
 .price-chg.dn { color:var(--teal) }
 .price-chg.flat { color:var(--muted) }
 .ohlc-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 }
-.ohlc-cell { background:var(--s2); border-radius:6px; padding:8px 10px }
-.ohlc-lbl { font-size:9px; letter-spacing:.12em; color:var(--muted); text-transform:uppercase }
-.ohlc-val { font-family:var(--mono); font-size:18px; font-weight:600; color:var(--text); margin-top:3px }
+.ohlc-cell { background:var(--s2); border-radius:6px; padding:7px 10px; display:flex; justify-content:space-between; align-items:center }
+.ohlc-lbl { font-size:11px; color:var(--muted) }
+.ohlc-val { font-family:var(--mono); font-size:17px; font-weight:600; color:var(--text) }
 
 /* indicators */
 .ind-row {
@@ -1070,6 +1070,7 @@ const STABS = {
     { key:'enable_skip_oscillation', label:'跳过震荡区间',   type:'toggle', hint:'趋势方向为震荡时跳过AI分析（无持仓）' },
     { key:'enable_skip_narrow',      label:'跳过窄幅区间',   type:'toggle', hint:'检测到窄幅区间时跳过AI分析（无持仓）' },
     { key:'enable_wechat_push',      label:'企业微信推送',   type:'toggle', hint:'关闭后停止企业微信群机器人消息推送' },
+    { key:'enable_force_1r',         label:'强制1:1风险回报', type:'toggle', hint:'止损距离 > 止盈距离时自动收紧止损至等距' },
   ],
 };
 
@@ -1185,7 +1186,6 @@ async function saveSettings() {
     } else {
       msg.textContent = '✓ ' + res.message;
       msg.className = 'smsg ok';
-      setTimeout(closeSettings, 2000);
     }
   } else {
     msg.textContent = '✕ 保存失败';
@@ -1204,7 +1204,8 @@ const $ = id => document.getElementById(id);
 const fmt = (v, d=2) => { if(v==null||v===''||v!==v) return '--'; const n=Number(v); if(isNaN(n)) return '--'; return n.toLocaleString('zh-CN',{minimumFractionDigits:d,maximumFractionDigits:d}); };
 const fmtSigned = (v, d=2) => { if(v==null||v===''||v!==v) return '--'; const n=Number(v); if(isNaN(n)) return '--'; const s = n>=0?'+':''; return s + n.toLocaleString('zh-CN',{minimumFractionDigits:d,maximumFractionDigits:d}); };
 // 价格字段：纯数字则格式化，否则原文显示
-const fmtPrice = v => { if(v==null||v===''||v!==v) return '--'; const s=String(v).replace(/,/g,''); const m=s.match(/[\d.]+/); if(!m) return '--'; const n=Number(m[0]); return isNaN(n)?'--':n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+const fmtP = v => { if(v==null||v===''||v!==v) return '--'; const n=Number(v); return isNaN(n)?'--':n.toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:2}); };
+const fmtPrice = v => { if(v==null||v===''||v!==v) return '--'; const s=String(v).replace(/,/g,''); const m=s.match(/[\d.]+/); if(!m) return '--'; const n=Number(m[0]); return isNaN(n)?'--':fmtP(n); };
 async function api(path, method='GET', body=null){
   try{
     const opts={method,headers:{'Content-Type':'application/json'}};
@@ -1790,7 +1791,7 @@ function _loadColWidths(){
 
 let _sumCols = [
   {key:'sym',    label:'合约',  render: (sym,c,q,a)=>`<td><span class="sum-sym">${keyToSym(sym).replace('KQ.m@','').replace('KQ.d@','')}</span></td>`},
-  {key:'price',  label:'现价',  render: (sym,c,q,a)=>{ const chg=q['涨跌幅%']; const cl=chg>0?'up':chg<0?'dn':''; return `<td class="mono ${cl}">${fmt(q['最新价'])}</td>`}},
+  {key:'price',  label:'现价',  render: (sym,c,q,a)=>{ const chg=q['涨跌幅%']; const cl=chg>0?'up':chg<0?'dn':''; return `<td class="mono ${cl}">${fmtP(q['最新价'])}</td>`}},
   {key:'chg',    label:'涨跌%', render: (sym,c,q,a)=>{ const chg=q['涨跌幅%']; const cl=chg>0?'up':chg<0?'dn':''; return `<td class="mono ${cl}">${chg!=null?(chg>0?'+':'')+Number(chg).toFixed(2)+'%':'--'}</td>`}},
   {key:'pnl',    label:'浮盈',  render: (sym,c,q,a)=>`<td class="mono ${c.pnl>0?'pnl-pos':c.pnl<0?'pnl-neg':''}">${c.pnl!=null?(c.pnl>0?'+':'')+fmt(c.pnl):'--'}</td>`},
   {key:'vol',    label:'手数',  render: (sym,c,q,a)=>`<td class="mono">${c.volume!=null?c.volume:'--'}</td>`},
@@ -1889,19 +1890,19 @@ function renderPrices(data){
   const prev = parseFloat($('qp').dataset.val||0);
   const p = q['最新价'];
   const qEl = $('qp');
-  qEl.textContent = fmt(p);
+  qEl.textContent = fmtP(p);
   qEl.dataset.val = p;
   const dir = p>prev?' up':p<prev?' dn':'';
   qEl.className = 'price-val'+dir;
   if(p !== prev && prev !== 0){ qEl.classList.remove('flash-up','flash-dn'); void qEl.offsetWidth; qEl.classList.add(p>prev?'flash-up':'flash-dn'); }
   const chg = q['涨跌幅%'];
   const chgEl = $('qc');
-  const chgAmt=q['涨跌额']; chgEl.textContent = p!=null ? `${chgAmt!=null?(chgAmt>0?'+':'')+fmt(chgAmt):'--'} / ${chg!=null?(chg>0?'+':'')+chg.toFixed(2)+'%':'--'}` : '--';
+  const chgAmt=q['涨跌额']; chgEl.textContent = p!=null ? `${chgAmt!=null?(chgAmt>0?'+':'')+fmtP(chgAmt):'--'} / ${chg!=null?(chg>0?'+':'')+chg.toFixed(2)+'%':'--'}` : '--';
   chgEl.className = 'price-chg'+(chg>0?' up':chg<0?' dn':' flat');
-  $('qo').textContent  = fmt(q['今开']);
-  $('qh').textContent  = fmt(q['最高']);
-  $('ql').textContent  = fmt(q['最低']);
-  $('qpc').textContent = fmt(q['昨收']);
+  $('qo').textContent  = fmtP(q['今开']);
+  $('qh').textContent  = fmtP(q['最高']);
+  $('ql').textContent  = fmtP(q['最低']);
+  $('qpc').textContent = fmtP(q['昨收']);
   const vol = q['当日累计成交量手']; $('qv').textContent = vol!=null?Number(vol).toLocaleString('zh-CN'):'--';
   const oi  = q['持仓量'];  $('qoi').textContent = oi!=null?Number(oi).toLocaleString('zh-CN'):'--';
   $('lp-sym').textContent = (activeSym||'').replace('KQ.m@','');

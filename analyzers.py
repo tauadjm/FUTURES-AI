@@ -42,6 +42,17 @@ _EN_EARLY_ENTRY_RE  = re.compile(r'"entry_price"\s*:\s*([\d.]+)')
 _EN_EARLY_SL_RE     = re.compile(r'"stop_loss"\s*:\s*(null|[\d.]+)(?=[^0-9.])')
 _EN_EARLY_TP_RE     = re.compile(r'"take_profit"\s*:\s*(null|[\d.]+)(?=[^0-9.])')
 
+def _trim_floats(obj):
+    """递归将整数浮点（3820.0）转为 int，保留有效小数（1234.5、700.02）。"""
+    if isinstance(obj, float):
+        return int(obj) if obj == int(obj) else obj
+    if isinstance(obj, dict):
+        return {k: _trim_floats(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_trim_floats(v) for v in obj]
+    return obj
+
+
 # ── _build_user_message 模块级常量（避免每次调用重建）──────────────
 _SKIP_FIELDS: frozenset[str] = frozenset({
     "pending", "error", "is_trading_time",
@@ -50,6 +61,7 @@ _SKIP_FIELDS: frozenset[str] = frozenset({
 })
 _SKIP_STRUCT: frozenset[str] = _get_strategy().get_skip_struct()
 _SKIP_ALL: frozenset[str] = _SKIP_FIELDS | _SKIP_STRUCT
+_QUOTE_SKIP: frozenset[str] = frozenset({"涨停价", "跌停价", "是否涨停", "是否跌停"})
 _KLINE_KEEP: tuple[str, ...] = (
     "time", "open", "high", "low", "close", "body_ratio",
 )
@@ -508,10 +520,10 @@ def _build_user_message(market_data: dict, history: list[dict], positions: list[
     # ── 预计算价格行为特征（委托策略插件构建）────────────────────
     features = _get_strategy().build_features(market_data, lang, klines_completed)
     last_bar_rating = features.pop("_last_bar_rating", "")
-
+    features = {k: v for k, v in features.items() if v is not None and v is not False and v != 0 and v != "" and not (isinstance(v, list) and len(v) == 0)}
 
     parts.append(_T["feat_hdr"])
-    parts.append(json.dumps(features, ensure_ascii=False, indent=2))
+    parts.append(json.dumps(_trim_floats(features), ensure_ascii=False, indent=2))
     parts.append("")
 
     # 过滤内部字段，只保留 AI 需要的数据（_SKIP_ALL 为模块级常量）
@@ -532,11 +544,15 @@ def _build_user_message(market_data: dict, history: list[dict], positions: list[
             for bar in klines_completed[-(config.AI_KLINE_COUNT + 1):]
         ]
 
+    # ── quote 子 dict：移除特征块已覆盖的冗余字段 ────────────────
+    if "quote" in clean_data:
+        clean_data["quote"] = {k: v for k, v in clean_data["quote"].items() if k not in _QUOTE_SKIP}
+
     # ── EN 模式：翻译 quote 键名 ──────────────────────────────────
     if lang == "en" and "quote" in clean_data:
         clean_data["quote"] = {_QUOTE_ZH2EN.get(k, k): v for k, v in clean_data["quote"].items()}
 
-    parts.append(json.dumps(clean_data, ensure_ascii=False, indent=2))
+    parts.append(json.dumps(_trim_floats(clean_data), ensure_ascii=False, indent=2))
     parts.append("")
     parts.append(_T["final_instr"])
 

@@ -294,7 +294,7 @@ async def precompute_structure(req: PrecomputeRequest):
     _SKIP = {
         "klines", "symbol", "product_name", "is_trading_time",
         "is_session_first_bar", "is_session_last_bar", "pending", "error",
-        "近期波段高点", "近期波段低点", "测量目标向上", "测量目标向下",
+        "近期波段高点", "近期波段低点",
     }
     # 前缀 _ 的内部字段默认不传，但前端展示需要的几个例外
     _EXPOSE_PRIVATE = {"_趋势阈值", "_ema斜率_10根"}
@@ -304,6 +304,19 @@ async def precompute_structure(req: PrecomputeRequest):
     out["quote"] = market_data.get("quote", {})
     out["ema20"] = market_data.get("ema20", {})
     out["timestamp"] = market_data.get("timestamp", "")
+
+    # 用 build_features 的结果覆盖测量目标（含 fallback 波段点补充）
+    try:
+        features = get_strategy_by_id(req.strategy_id).build_features(
+            market_data, lang="zh", klines_completed=None
+        )
+        out["测量目标向上"] = features.get("测量目标向上", [])
+        out["测量目标向下"] = features.get("测量目标向下", [])
+        out["最近3根信号棒评级"] = features.get("最近3根信号棒评级", [])
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("build_features failed in precompute: %s", e)
+
     return JSONResponse(out)
 
 
