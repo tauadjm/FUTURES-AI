@@ -550,6 +550,63 @@ tr:hover td { background:var(--ghost) }
       </div>
     </div>
 
+    <!-- 批量回测 -->
+    <div class="side-section" id="batch-section">
+      <div class="sec-title">批量回测</div>
+
+      <!-- 起点/终点 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
+        <div>
+          <div class="pg-label" style="margin-bottom:2px">起始K线</div>
+          <div style="display:flex;gap:3px;align-items:center">
+            <span id="batch-start-label" style="font-family:var(--mono);font-size:9px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">未设置</span>
+            <button class="btn" id="batch-set-start" onclick="setBatchStart()" disabled
+                    style="padding:1px 5px;font-size:9px;flex-shrink:0">设为起点</button>
+          </div>
+        </div>
+        <div>
+          <div class="pg-label" style="margin-bottom:2px">结束K线</div>
+          <div style="display:flex;gap:3px;align-items:center">
+            <span id="batch-end-label" style="font-family:var(--mono);font-size:9px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">未设置</span>
+            <button class="btn" id="batch-set-end" onclick="setBatchEnd()" disabled
+                    style="padding:1px 5px;font-size:9px;flex-shrink:0">设为终点</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设置行 -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-family:var(--mono);font-size:10px">
+        <span style="color:var(--muted)">并发</span>
+        <select id="batch-concurrency" style="background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:3px;font-size:10px;padding:1px 4px">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer;color:var(--muted)">
+          <input type="checkbox" id="batch-skip-done" checked style="cursor:pointer"> 跳过已分析
+        </label>
+      </div>
+
+      <!-- 进度条 -->
+      <div id="batch-progress-wrap" style="display:none;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:3px">
+          <span id="batch-progress-text">0 / 0</span>
+          <span id="batch-progress-pct">0%</span>
+        </div>
+        <div style="height:3px;background:var(--line);border-radius:2px">
+          <div id="batch-progress-bar" style="height:100%;width:0%;background:var(--amber);border-radius:2px;transition:width .15s"></div>
+        </div>
+      </div>
+
+      <!-- 按钮 -->
+      <div style="display:flex;gap:4px">
+        <button class="btn amber" id="batch-run-btn" onclick="runBatchBacktest()"
+                style="flex:1;padding:5px;font-size:11px" disabled>开始批量分析</button>
+        <button class="btn rose" id="batch-cancel-btn" onclick="cancelBatch()"
+                style="display:none;padding:5px;font-size:11px">取消</button>
+      </div>
+    </div>
+
     <!-- 分析中提示 -->
     <div id="analyzing-tip" style="display:none" class="side-section">
       <div style="text-align:center;padding:20px 0">
@@ -1101,6 +1158,7 @@ async function loadChart() {
     const data = await res.json();
     klinesData = data.klines || [];
     currentSymbol = symbol;
+    _updateBatchRunBtn();
 
     if (klinesData.length === 0) {
       document.getElementById('chart-hint').style.display = '';
@@ -1169,8 +1227,10 @@ async function selectBar(barTime) {
     el.className   = 'pg-val ' + (pct >= 0 ? 'green' : 'red');
   }
 
-  // 启用分析按钮
+  // 启用分析按钮 + 批量设点按钮
   document.getElementById('analyze-btn').disabled = false;
+  document.getElementById('batch-set-start').disabled = false;
+  document.getElementById('batch-set-end').disabled   = false;
 
   // 调预计算接口
   document.getElementById('precompute-loading').style.display = '';
@@ -1729,6 +1789,154 @@ async function loadSimulations(symbol, intervalMin) {
   } catch(e) {
     console.error('恢复模拟标记失败', e);
   }
+}
+
+// ─────────────────────────────────────────────────────────
+// 批量回测
+// ─────────────────────────────────────────────────────────
+let batchStartTime  = null;
+let batchEndTime    = null;
+let _batchCancelled = false;
+
+function _fmtBatchTime(cstSec) {
+  const d = toCst(cstSec);
+  return `${d.getUTCFullYear()}.${d.getUTCMonth()+1}.${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+}
+
+function setBatchStart() {
+  if (!selectedBarTime) return;
+  batchStartTime = selectedBarTime;
+  const el = document.getElementById('batch-start-label');
+  el.textContent = _fmtBatchTime(batchStartTime);
+  el.style.color = 'var(--amber)';
+  _updateBatchRunBtn();
+}
+
+function setBatchEnd() {
+  if (!selectedBarTime) return;
+  batchEndTime = selectedBarTime;
+  const el = document.getElementById('batch-end-label');
+  el.textContent = _fmtBatchTime(batchEndTime);
+  el.style.color = 'var(--amber)';
+  _updateBatchRunBtn();
+}
+
+function _updateBatchRunBtn() {
+  const ok = batchStartTime && batchEndTime && batchStartTime <= batchEndTime && currentSymbol;
+  document.getElementById('batch-run-btn').disabled = !ok;
+}
+
+function cancelBatch() {
+  _batchCancelled = true;
+}
+
+function _setBatchProgress(done, total) {
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('batch-progress-text').textContent = `${done} / ${total}`;
+  document.getElementById('batch-progress-pct').textContent  = `${pct}%`;
+  document.getElementById('batch-progress-bar').style.width  = `${pct}%`;
+}
+
+async function runBatchBacktest() {
+  if (!batchStartTime || !batchEndTime || !currentSymbol) return;
+
+  const modelId     = document.getElementById('model-select').value;
+  if (!modelId) { alert('请选择AI模型'); return; }
+
+  const strategyId  = document.getElementById('strategy-select').value || '';
+  const concurrency = parseInt(document.getElementById('batch-concurrency').value) || 2;
+  const skipDone    = document.getElementById('batch-skip-done').checked;
+  const priceTick   = getPriceTick(currentSymbol);
+
+  let bars = klinesData.filter(b => b.time >= batchStartTime && b.time <= batchEndTime);
+  if (skipDone) bars = bars.filter(b => !_simByBarTime.has(b.time));
+  if (!bars.length) { alert('范围内无可分析K线'); return; }
+
+  _batchCancelled = false;
+  document.getElementById('batch-run-btn').style.display    = 'none';
+  document.getElementById('batch-cancel-btn').style.display = '';
+  document.getElementById('batch-progress-wrap').style.display = '';
+  _setBatchProgress(0, bars.length);
+
+  let done = 0;
+  let idx  = 0;
+
+  async function _batchWorker() {
+    while (idx < bars.length && !_batchCancelled) {
+      const bar = bars[idx++];
+      try {
+        const aRes = await fetch('/backtest/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol:           currentSymbol,
+            bar_time:         bar.time - 28800,
+            model_id:         modelId,
+            interval_minutes: currentIntervalMin,
+            strategy_id:      strategyId,
+          }),
+        });
+        if (_batchCancelled) break;
+        if (!aRes.ok) { done++; _setBatchProgress(done, bars.length); continue; }
+        const aData = await aRes.json();
+
+        if (!aData.skipped) {
+          _simByBarTime.set(bar.time, {
+            analysis_id: aData.analysis_id,
+            bar_time:    aData.bar_time,
+            model_id:    aData.model_id,
+            created_at:  new Date().toISOString(),
+            '操作建议':  aData['操作建议'],
+            '入场价':    aData['入场价'],
+            '止损价':    aData['止损价'],
+            '止盈价':    aData['止盈价'],
+          });
+
+          const action    = aData['操作建议'];
+          const direction = action === '做多' ? 'LONG' : action === '做空' ? 'SHORT' : null;
+          const entry     = aData['入场价'];
+          const sl        = aData['止损价'];
+          const tp        = aData['止盈价'] || null;
+
+          if (direction && entry != null && sl != null && !_batchCancelled) {
+            const sRes = await fetch('/backtest/api/simulate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                analysis_id: aData.analysis_id,
+                direction,
+                entry_price: entry,
+                stop_loss:   sl,
+                take_profit: tp,
+                price_tick:  priceTick,
+                max_bars:    200,
+              }),
+            });
+            if (sRes.ok) {
+              const sData = await sRes.json();
+              if (_simByBarTime.has(bar.time)) {
+                _simByBarTime.get(bar.time).simulation = sData;
+              }
+            }
+          }
+        }
+      } catch(e) { console.warn('batch bar failed:', bar.time, e); }
+
+      done++;
+      _setBatchProgress(done, bars.length);
+    }
+  }
+
+  try {
+    await Promise.all(Array.from({ length: concurrency }, _batchWorker));
+  } finally {
+    document.getElementById('batch-run-btn').style.display    = '';
+    document.getElementById('batch-cancel-btn').style.display = 'none';
+  }
+
+  // 传入全部记录（含观望/持有），避免清空后丢失无模拟结果的分析
+  restoreSimulationMarkers([..._simByBarTime.values()]);
+  loadStats();
 }
 
 function restoreSimulationMarkers(simulations) {

@@ -185,7 +185,7 @@ async def _get_positions_shared() -> list:
 # 行情 fetch 直接按任务并发执行：fetch() 只读内存，不调用 tqsdk 函数。
 
 
-async def _wechat_push(text: str) -> None:
+async def _wechat_push(text: str, _retries: int = 3, _delay: float = 5.0) -> None:
     """推送文字消息到企业微信群机器人，KEY 未配置或推送关闭时静默跳过"""
     if not config.ENABLE_WECHAT_PUSH:
         return
@@ -193,12 +193,18 @@ async def _wechat_push(text: str) -> None:
     if not key:
         return
     url = f"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={key}"
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=5) as client:
-            await client.post(url, json={"msgtype": "text", "text": {"content": text}})
-    except Exception as e:
-        logger.warning(f"[微信推送] 失败: {e}")
+    import httpx
+    for attempt in range(1, _retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                await client.post(url, json={"msgtype": "text", "text": {"content": text}})
+            return
+        except Exception as e:
+            if attempt < _retries:
+                logger.warning(f"[微信推送] 第{attempt}次失败，{_delay:.0f}s 后重试: {e}")
+                await asyncio.sleep(_delay)
+            else:
+                logger.warning(f"[微信推送] 失败（已重试{_retries}次）: {e}")
 
 
 def _sym_to_product(symbol: str) -> str:
@@ -1558,8 +1564,8 @@ async def lifespan(app: FastAPI):
                 is_breakeven = (not is_profit) and (abs(cp - ep) / ep <= 0.002)
                 if is_breakeven:
                     logic = (
-                        f"保本止损触发，开仓价{ep}，平仓价{cp}，亏损{pnl_pts}点（接近保本）。"
-                        f"形态和趋势若仍有效，可立即在合理位置重新入场（Al Brooks 保本陷阱场景）。"
+                        f"保本止损触发，开仓价{ep}，平仓价{cp}，亏损{pnl_pts}点。"
+                        f"形态和趋势若仍有效，可立即在合理位置重新入场。"
                     )
                 else:
                     logic = (
