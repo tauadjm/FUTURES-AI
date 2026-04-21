@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>期货 AI · 多合约分析</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:ital,wght@0,300..800;1,300..800&family=IBM+Plex+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg:#060a0f; --s1:#0a1018; --s2:#0e1622; --s3:#13202f;
@@ -15,11 +16,18 @@
   --rose:#fb7185; --rose2:#9f1239;
   --sky:#38bdf8;
   --text:#dde8f0; --dim:#8baab8; --muted:#3d5870;
-  --mono:'Geist Mono','JetBrains Mono',monospace;
+  --mono:'Azeret Mono','JetBrains Mono',monospace;
   --sans:'IBM Plex Sans SC',sans-serif;
 }
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
-html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:var(--sans) }
+html,body {
+  height:100%; overflow:hidden;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(30,46,66,.55) 1px, transparent 0),
+    var(--bg);
+  background-size: 22px 22px, auto;
+  color:var(--text); font-family:var(--sans);
+}
 ::-webkit-scrollbar { width:5px; height:5px }
 ::-webkit-scrollbar-track { background:transparent }
 ::-webkit-scrollbar-thumb { background:var(--line2); border-radius:3px }
@@ -28,11 +36,21 @@ html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--text
 /* ── NAV ─────────────────────────────── */
 #nav {
   height:52px; flex-shrink:0;
-  background:var(--s1); border-bottom:1px solid var(--line);
+  background:linear-gradient(to bottom, #0e1a28, var(--s1));
+  border-bottom:1px solid var(--line);
   display:flex; align-items:center; gap:8px; padding:0 14px;
 }
-.logo { font-family:var(--mono); font-size:14px; font-weight:700; letter-spacing:.15em; color:var(--amber) }
-.logo small { display:block; font-size:8px; color:var(--muted); letter-spacing:.1em; font-weight:400 }
+.logo {
+  font-family:var(--mono); font-size:14px; font-weight:700; letter-spacing:.15em;
+  background:linear-gradient(135deg, #f59e0b 0%, #fde68a 55%, #f59e0b 100%);
+  background-size:200% auto;
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation:logo-shimmer 6s linear infinite;
+}
+@keyframes logo-shimmer { to { background-position: 200% center } }
+.logo small { display:block; font-size:8px; color:var(--muted); letter-spacing:.1em; font-weight:400;
+  -webkit-text-fill-color:var(--muted); }
 .ndiv { width:1px; height:28px; background:var(--line); flex-shrink:0; margin:0 4px }
 .live-dot {
   width:7px; height:7px; border-radius:50%;
@@ -222,10 +240,11 @@ html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--text
 .price-hero { margin-bottom:4px }
 .price-val {
   font-family:var(--mono); font-size:52px; font-weight:700;
-  line-height:1; letter-spacing:-1px; color:var(--text);
+  line-height:1; letter-spacing:-1px; color:var(--dim);
+  transition:color .3s, text-shadow .3s;
 }
-.price-val.up { color:var(--rose) }
-.price-val.dn { color:var(--teal) }
+.price-val.up { color:var(--rose); text-shadow:0 0 18px rgba(251,113,133,.35), 0 0 40px rgba(251,113,133,.12) }
+.price-val.dn { color:var(--teal); text-shadow:0 0 18px rgba(45,212,191,.35), 0 0 40px rgba(45,212,191,.12) }
 .price-chg { font-family:var(--mono); font-size:15px; font-weight:500; margin-top:4px }
 .price-chg.up { color:var(--rose) }
 .price-chg.dn { color:var(--teal) }
@@ -1892,10 +1911,10 @@ function renderPrices(data){
   const qEl = $('qp');
   qEl.textContent = fmtP(p);
   qEl.dataset.val = p;
-  const dir = p>prev?' up':p<prev?' dn':'';
+  const chg = q['涨跌幅%'];
+  const dir = chg>0?' up':chg<0?' dn':'';
   qEl.className = 'price-val'+dir;
   if(p !== prev && prev !== 0){ qEl.classList.remove('flash-up','flash-dn'); void qEl.offsetWidth; qEl.classList.add(p>prev?'flash-up':'flash-dn'); }
-  const chg = q['涨跌幅%'];
   const chgEl = $('qc');
   const chgAmt=q['涨跌额']; chgEl.textContent = p!=null ? `${chgAmt!=null?(chgAmt>0?'+':'')+fmtP(chgAmt):'--'} / ${chg!=null?(chg>0?'+':'')+chg.toFixed(2)+'%':'--'}` : '--';
   chgEl.className = 'price-chg'+(chg>0?' up':chg<0?' dn':' flat');
